@@ -1,0 +1,213 @@
+// Prisma schema for BezProblem internal system
+//
+// DEV: uses SQLite (file-based, zero setup) so you can run this today.
+// PROD: switch provider to "postgresql" and set DATABASE_URL to your
+// Postgres connection string — no changes to models are required.
+// See README.md "Moving to Postgres" section.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ---------- Auth / Employees ----------
+
+model Role {
+  id          String   @id @default(cuid())
+  name        String   @unique // "ADMIN", "EMPLOYEE", or custom roles added later
+  label       String   // human-readable name, e.g. "Администратор"
+  permissions String   // JSON-encoded array of permission keys, e.g. ["clients.view","clients.edit"]
+  employees   Employee[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Employee {
+  id            String   @id @default(cuid())
+  firstName     String
+  lastName      String
+  email         String   @unique
+  passwordHash  String
+  roleId        String
+  role          Role     @relation(fields: [roleId], references: [id])
+  branchId      String?
+  branch        Branch?  @relation(fields: [branchId], references: [id])
+  isActive      Boolean  @default(true) // false = blocked account
+  lastLoginAt   DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  actionLogs        ActionLog[]
+  clientsCreated    Client[]            @relation("ClientCreatedBy")
+  clientsUpdated    Client[]            @relation("ClientUpdatedBy")
+  maintenanceLogged MaintenanceRecord[] @relation("MaintenanceLoggedBy")
+}
+
+// ---------- Branches ----------
+
+model Branch {
+  id         String    @id @default(cuid())
+  name       String    @unique
+  address    String?
+  isArchived Boolean   @default(false)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  employees Employee[]
+  vehicles  Vehicle[]
+}
+
+// ---------- Clients ----------
+
+model Client {
+  id              String   @id @default(cuid())
+  firstName       String
+  lastName        String
+  email           String?
+  phone           String?
+  city            String?
+  drivingCity     String?
+  pesel           String?
+  documentNumber  String?
+  department      String?
+  bankAccount     String?
+  status          String   @default("ACTIVE") // ACTIVE, ARCHIVED, etc.
+  notes           String?
+  isArchived      Boolean  @default(false)
+
+  createdById String?
+  createdBy   Employee? @relation("ClientCreatedBy", fields: [createdById], references: [id])
+  updatedById String?
+  updatedBy   Employee? @relation("ClientUpdatedBy", fields: [updatedById], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  vehicles         VehicleAssignment[]
+  debts            Debt[]
+  payments         Payment[]
+
+  @@index([lastName, firstName])
+  @@index([pesel])
+  @@index([documentNumber])
+  @@index([phone])
+  @@index([email])
+}
+
+// ---------- Vehicles ----------
+
+model Vehicle {
+  id             String   @id @default(cuid())
+  regNumber      String   @unique
+  make           String
+  model          String
+  year           Int?
+  vin            String?  @unique
+  type           String?
+  branchId       String?
+  branch         Branch?  @relation(fields: [branchId], references: [id])
+  status         String   @default("AT_BRANCH") // see VehicleStatus values below
+  mileage        Int?
+  condition      String?
+  notes          String?
+  isArchived     Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  assignments VehicleAssignment[]
+  maintenance MaintenanceRecord[]
+}
+
+// Standard status values (admin-configurable list lives in app config / StatusOption table below):
+// AT_BRANCH, ISSUED_TO_CLIENT, IN_REPAIR, IN_SERVICE, RESERVED, UNAVAILABLE, SOLD_OFF
+
+model StatusOption {
+  id       String @id @default(cuid())
+  domain   String // "VEHICLE" | "DEBT"
+  value    String // machine key
+  label    String // display label
+  sortOrder Int   @default(0)
+
+  @@unique([domain, value])
+}
+
+// History of which client a vehicle was assigned to
+model VehicleAssignment {
+  id         String    @id @default(cuid())
+  vehicleId  String
+  vehicle    Vehicle   @relation(fields: [vehicleId], references: [id])
+  clientId   String
+  client     Client    @relation(fields: [clientId], references: [id])
+  issuedAt   DateTime  @default(now())
+  returnedAt DateTime?
+  notes      String?
+}
+
+// ---------- Maintenance ----------
+
+model MaintenanceRecord {
+  id              String   @id @default(cuid())
+  vehicleId       String
+  vehicle         Vehicle  @relation(fields: [vehicleId], references: [id])
+  workType        String
+  performedAt     DateTime
+  mileageAtService Int?
+  nextMileageDue  Int?
+  nextServiceDue  DateTime?
+  cost            Float?
+  workshop        String?
+  description     String?
+  loggedById      String?
+  loggedBy        Employee? @relation("MaintenanceLoggedBy", fields: [loggedById], references: [id])
+  createdAt       DateTime @default(now())
+}
+
+// ---------- Debts ----------
+
+model Debt {
+  id          String    @id @default(cuid())
+  clientId    String
+  client      Client    @relation(fields: [clientId], references: [id])
+  amount      Float
+  reason      String?
+  incurredAt  DateTime  @default(now())
+  dueDate     DateTime?
+  status      String    @default("NEW") // NEW, PARTIALLY_PAID, PAID, OVERDUE, IN_COLLECTION
+  comment     String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  payments Payment[]
+}
+
+model Payment {
+  id        String   @id @default(cuid())
+  debtId    String?
+  debt      Debt?    @relation(fields: [debtId], references: [id])
+  clientId  String
+  client    Client   @relation(fields: [clientId], references: [id])
+  amount    Float
+  paidAt    DateTime @default(now())
+  note      String?
+}
+
+// ---------- Audit log ----------
+
+model ActionLog {
+  id         String   @id @default(cuid())
+  employeeId String?
+  employee   Employee? @relation(fields: [employeeId], references: [id])
+  action     String   // e.g. "UPDATE_STATUS"
+  entityType String   // e.g. "Vehicle"
+  entityId   String
+  oldValue   String?  // JSON-encoded
+  newValue   String?  // JSON-encoded
+  createdAt  DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([employeeId])
+}

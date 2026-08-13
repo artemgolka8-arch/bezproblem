@@ -1,0 +1,80 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Light theme (default) */
+  --c-surface: 246 249 255; /* page background — soft blue-white */
+  --c-card: 255 255 255;
+  --c-line: 226 232 245;
+  --c-ink: 16 25 46;
+  --c-muted: 100 110 130;
+}
+
+.dark {
+  /* Dark theme */
+  --c-surface: 8 12 26;
+  --c-card: 15 21 42;
+  --c-line: 33 43 71;
+  --c-ink: 236 241 255;
+  --c-muted: 148 163 194;
+}
+
+body {
+  font-family: "Inter", system-ui, sans-serif;
+  background-color: rgb(var(--c-surface));
+  color: rgb(var(--c-ink));
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.mono {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+}
+
+.font-display {
+  font-family: "Space Grotesk", "Inter", system-ui, sans-serif;
+}
+
+.brand-gradient-text {
+  background-image: linear-gradient(135deg, #2e6ef6 0%, #22d3ee 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.input {
+  width: 100%;
+  background-color: rgb(var(--c-card));
+  border: 1px solid rgb(var(--c-line));
+  border-radius: 10px;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  color: rgb(var(--c-ink));
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.input::placeholder {
+  color: rgb(var(--c-muted) / 0.7);
+}
+.input:focus {
+  border-color: #2e6ef6;
+  box-shadow: 0 0 0 3px rgb(46 110 246 / 0.15);
+}
+
+/* Visible keyboard focus everywhere, per accessibility floor */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid rgb(46 110 246);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

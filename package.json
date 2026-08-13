@@ -1,0 +1,8 @@
+{
+  "name": "bezproblem",
+  "private": true,
+  "scripts": {
+    "build": "npm install --prefix frontend && npm run build --prefix frontend && npm install --prefix backend && npx prisma generate --schema=backend/prisma/schema.prisma",
+    "start": "node backend/src/index.js"
+  }
+}
